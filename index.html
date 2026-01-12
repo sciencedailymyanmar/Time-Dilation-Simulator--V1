@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Dilation Simulator - Science Daily</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #00f2ff; /* Neon Cyan */
+            --secondary-color: #ff0055; /* Neon Pink */
+            --earth-color: #4ade80; /* Neon Green */
+            --bg-dark: #050a18;
+            --glass-bg: rgba(15, 23, 42, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-light: #e2e8f0;
+            --thruster-intensity: 0; /* CSS Variable changed by JS */
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: radial-gradient(ellipse at bottom, #1b2735 0%, var(--bg-dark) 100%);
+            color: var(--text-light);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* --- Background Star Animation --- */
+        #stars, #stars2, #stars3 {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            z-index: -1; animation: animStar 50s linear infinite;
+        }
+        #stars:after, #stars2:after, #stars3:after { content: " "; position: absolute; top: 2000px; width: 1px; height: 1px; background: transparent; box-shadow: inherit; }
+        #stars { width: 1px; height: 1px; background: transparent; box-shadow: 174px 387px #FFF , 1462px 1347px #FFF , 317px 1634px #FFF , 1279px 199px #FFF , 1707px 462px #FFF , 995px 937px #FFF , 1401px 149px #FFF; animation-duration: 50s; }
+        #stars2 { width: 2px; height: 2px; background: transparent; box-shadow: 350px 1728px #FFF , 861px 256px #FFF , 1503px 1541px #FFF , 489px 1221px #FFF , 1596px 1178px #FFF , 54px 667px #FFF , 532px 169px #FFF; animation-duration: 100s; }
+        @keyframes animStar { from { transform: translateY(0px); } to { transform: translateY(-2000px); } }
+
+        /* --- Typography & Header --- */
+        h1, h2, .brand-header { font-family: 'Orbitron', sans-serif; letter-spacing: 2px; }
+        
+        .brand-header {
+            color: var(--primary-color);
+            font-size: 1rem;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
+        }
+
+        h1 {
+            background: linear-gradient(to right, var(--text-light), var(--primary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center; margin: 0 0 10px 0; font-size: 2.5rem;
+        }
+
+        .subtitle { text-align: center; color: #94a3b8; max-width: 600px; margin-bottom: 30px; line-height: 1.6; }
+
+        /* --- Glassmorphism Cards --- */
+        .container { display: flex; flex-wrap: wrap; gap: 30px; justify-content: center; width: 100%; max-width: 900px; position: relative; z-index: 10; }
+
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 30px 20px;
+            flex: 1; min-width: 300px;
+            text-align: center;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: all 0.3s ease;
+            position: relative; overflow: hidden;
+        }
+
+        .card.earth { border-bottom: 3px solid var(--earth-color); }
+        .card.space { border-bottom: 3px solid var(--secondary-color); }
+        
+        /* Dynamic Neon Glow based on speed */
+        .card.space::before {
+            content: ''; position: absolute; inset: 0;
+            box-shadow: 0 0 calc(var(--thruster-intensity) * 30px) var(--secondary-color);
+            opacity: var(--thruster-intensity);
+            transition: opacity 0.3s ease; border-radius: 20px; z-index: -1;
+        }
+
+        .icon-wrapper { font-size: 4rem; margin-bottom: 15px; position: relative; display: inline-block; }
+
+        /* --- Rocket Engine Effect --- */
+        .rocket-icon { display: inline-block; position: relative; z-index: 2; }
+        .engine-plume {
+            position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%);
+            width: 20px; height: 40px;
+            background: linear-gradient(to bottom, var(--secondary-color), transparent);
+            filter: blur(10px);
+            opacity: var(--thruster-intensity); /* Controlled by JS */
+            transition: opacity 0.3s, height 0.3s;
+            z-index: 1;
+        }
+
+        /* Standard Float Animation */
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-15px); } 100% { transform: translateY(0px); } }
+        .floating { animation: float 4s ease-in-out infinite; }
+
+        .timer { font-family: 'Orbitron', monospace; font-size: 3rem; font-weight: 700; margin: 10px 0; text-shadow: 0 0 15px rgba(255,255,255,0.3); }
+        .label { color: var(--primary-color); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
+
+        /* --- Controls Section --- */
+        .controls {
+            background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border); padding: 30px;
+            border-radius: 20px; width: 100%; max-width: 900px; margin-top: 30px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); position: relative; z-index: 10;
+        }
+
+        /* --- Custom Neon Slider --- */
+        input[type=range] {
+            -webkit-appearance: none; width: 100%; height: 12px; background: rgba(255,255,255,0.1);
+            border-radius: 10px; margin: 30px 0; outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none; width: 25px; height: 25px;
+            background: var(--primary-color); border-radius: 50%; cursor: pointer;
+            box-shadow: 0 0 15px var(--primary-color), 0 0 30px var(--primary-color);
+            transition: transform 0.2s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+        .speed-display { display: flex; justify-content: space-between; align-items: center; font-family: 'Orbitron', sans-serif; }
+        .speed-value { font-size: 1.4rem; color: var(--primary-color); text-shadow: 0 0 10px var(--primary-color); }
+
+        /* --- Modern Buttons --- */
+        .btn-group { display: flex; gap: 15px; justify-content: center; margin-top: 30px; flex-wrap: wrap; }
+        button {
+            padding: 12px 30px; border: none; border-radius: 30px; cursor: pointer;
+            font-weight: bold; font-family: 'Orbitron', sans-serif; letter-spacing: 1px;
+            transition: all 0.3s ease; position: relative; overflow: hidden;
+        }
+        .btn-start { background: linear-gradient(45deg, var(--primary-color), #005bea); color: #000; box-shadow: 0 0 20px rgba(0, 242, 255, 0.4); }
+        .btn-stop { background: linear-gradient(45deg, var(--secondary-color), #ff5f6d); color: white; box-shadow: 0 0 20px rgba(255, 0, 85, 0.4); }
+        .btn-reset { background: rgba(255, 255, 255, 0.1); color: white; border: 1px solid rgba(255,255,255,0.2); }
+        button:hover { transform: translateY(-3px); box-shadow: 0 10px 20px -10px rgba(255,255,255,0.5); }
+        button:active { transform: translateY(1px); }
+
+        .fact-box { margin-top: 25px; padding: 20px; background: rgba(0, 242, 255, 0.05); border-radius: 10px; border-left: 4px solid var(--primary-color); font-size: 1rem; }
+
+        /* --- User Guide Collapsible --- */
+        .guide-details { width: 100%; max-width: 900px; margin-bottom: 20px; z-index: 10; }
+        .guide-summary {
+            background: var(--glass-bg); backdrop-filter: blur(12px); color: var(--primary-color);
+            padding: 15px 25px; border-radius: 15px; cursor: pointer; font-family: 'Orbitron', sans-serif;
+            border: 1px solid var(--glass-border); list-style: none; display: flex; justify-content: space-between; align-items: center;
+        }
+        .guide-summary::after { content: '▼'; font-size: 0.8rem; transition: transform 0.3s; }
+        details[open] .guide-summary::after { transform: rotate(180deg); }
+        .guide-content {
+            background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); padding: 20px 30px;
+            border-radius: 0 0 15px 15px; border: 1px solid var(--glass-border); border-top: none; margin-top: -5px;
+        }
+        .guide-content ol { padding-left: 20px; line-height: 1.8; }
+        .guide-content li::marker { color: var(--primary-color); font-weight: bold; }
+
+        footer { margin-top: 40px; color: #64748b; font-size: 0.9rem; z-index: 10; }
+
+        /* Responsive Adjustments */
+        @media (max-width: 600px) {
+            h1 { font-size: 1.8rem; }
+            .timer { font-size: 2.2rem; }
+            .btn-group { flex-direction: column; width: 100%; }
+            button { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div id="stars"></div><div id="stars2"></div><div id="stars3"></div>
+
+    <div class="brand-header">Science Daily မှ တင်ဆက်သည်</div>
+    <h1>Time Dilation Simulator</h1>
+    <p class="subtitle">
+        အိုင်းစတိုင်း၏ နှိုင်းရသီအိုရီ (Theory of Relativity) အရ အလျင်မြန်လေ အချိန်နှေးလေ ဖြစ်ပုံကို မျက်စိဖြင့် တပ်အပ်မြင်တွေ့နိုင်မည့် လက်တွေ့စမ်းသပ်ခန်း။
+    </p>
+
+    <details class="guide-details">
+        <summary class="guide-summary">🔰 အသုံးပြုပုံ လမ်းညွှန် (How to Use)</summary>
+        <div class="guide-content">
+            <ol>
+                <li>အောက်ဆုံးရှိ <b>"Slider (ထိန်းချုပ်တံ)"</b> ကို ဆွဲ၍ အာကာသယာဉ်၏ အမြန်နှုန်းကို သတ်မှတ်ပါ။ (၉၀% အထက် ဆွဲတင်ကြည့်ရန် အကြံပြုပါသည်။)</li>
+                <li><b>"စတင်မယ် (Start)"</b> ခလုတ်ကို နှိပ်ပါ။</li>
+                <li>ဘယ်ဘက် (ကမ္ဘာ) နှင့် ညာဘက် (အာကာသ) တို့ရှိ နာရီများ၏ ကုန်ဆုံးမှုနှုန်း မတူညီပုံကို လေ့လာပါ။ ယာဉ်အမြန်နှုန်း မြင့်လေလေ၊ ညာဘက်နာရီ ပိုနှေးလေလေ ဖြစ်ပါလိမ့်မည်။</li>
+                <li>အမြန်နှုန်းကို အချိန်မရွေး ထပ်မံ ပြောင်းလဲ စမ်းသပ်နိုင်ပါသည်။</li>
+            </ol>
+        </div>
+    </details>
+
+    <div class="container">
+        <div class="card earth">
+            <div class="icon-wrapper">🌍☕</div>
+            <div class="label">ကမ္ဘာပေါ်ရှိ ညီအစ်ကို</div>
+            <div class="timer" id="earthTime">0.00</div>
+            <div class="label">ကုန်ဆုံးသွားသော နှစ် (Years)</div>
+            <p style="font-size: 0.85rem; color: #94a3b8; margin-top: 15px;">သာမန်အချိန်အတိုင်း နေထိုင်နေသူ</p>
+        </div>
+
+        <div class="card space">
+            <div class="icon-wrapper floating">
+                <span class="rocket-icon">🚀👨‍🚀</span>
+                <div class="engine-plume"></div>
+            </div>
+            <div class="label">အာကာသယာဉ်ပေါ်ရှိ ညီအစ်ကို</div>
+            <div class="timer" id="spaceTime">0.00</div>
+            <div class="label">ကုန်ဆုံးသွားသော နှစ် (Years)</div>
+            <p style="font-size: 0.85rem; color: #94a3b8; margin-top: 15px;">အလင်းအလျင်နီးပါး ခရီးနှင်နေသူ</p>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="speed-display">
+            <span>🚀 ယာဉ်၏ အလျင် (Velocity):</span>
+            <span class="speed-value" id="speedVal">0 % c (Light Speed)</span>
+        </div>
+        
+        <input type="range" id="speedSlider" min="0" max="99.9" step="0.1" value="0">
+        
+        <div class="fact-box" id="explanation">
+            အလျင် ၀% တွင် အချိန်ကွာခြားမှု မရှိပါ။ Slider ကို ဆွဲတင်ပြီး စမ်းသပ်ကြည့်ပါ။
+        </div>
+
+        <div class="btn-group">
+            <button class="btn-start" onclick="startSimulation()">▶ စတင်မယ် (Start)</button>
+            <button class="btn-stop" onclick="stopSimulation()">⏸ ရပ်မယ် (Stop)</button>
+            <button class="btn-reset" onclick="resetSimulation()">↺ အစကပြန်သွား (Reset)</button>
+        </div>
+    </div>
+
+    <footer>
+        © 2024 Time Dilation Visualization. Created by Science Daily.
+    </footer>
+
+    <script>
+        let earthYears = 0;
+        let spaceYears = 0;
+        let isRunning = false;
+        let lastTimestamp = 0;
+        const root = document.documentElement;
+
+        const earthDisplay = document.getElementById('earthTime');
+        const spaceDisplay = document.getElementById('spaceTime');
+        const slider = document.getElementById('speedSlider');
+        const speedValDisplay = document.getElementById('speedVal');
+        const explanation = document.getElementById('explanation');
+
+        // Update UI and Visual Effects when slider moves
+        slider.addEventListener('input', function() {
+            updateSpeedVisuals(this.value);
+        });
+
+        function updateSpeedVisuals(val) {
+            speedValDisplay.innerText = val + " % c (Light Speed)";
+            
+            // Calculate thruster intensity (0 to 1) based on speed
+            let intensity = val / 100;
+            // Update CSS variable for neon glow and engine plume effect
+            root.style.setProperty('--thruster-intensity', intensity);
+            
+            // Math Logic
+            let v = val / 100;
+            let dilationFactor = Math.sqrt(1 - (v * v));
+            
+            let msg = "";
+            if (val == 0) {
+                msg = "အလျင် ၀% ဖြစ်သောကြောင့် အချိန်သွားနှုန်း အတူတူပါပဲ။";
+            } else if (val < 50) {
+                msg = "အမြန်နှုန်း နည်းနေသေးလို့ အချိန်ကွာခြားချက် သိပ်မသိသာသေးပါဘူး။ ပိုမြန်မြန် မောင်းကြည့်ပါ။";
+            } else if (val > 99) {
+                msg = `အလွန်အံ့သြဖွယ်ပါ! အလင်းအလျင်နီးပါးဖြစ်လို့ ယာဉ်ပေါ်မှာ အချိန်ရပ်တန့်လုနီးပါး ဖြစ်နေပါပြီ။`;
+            } else if (val > 90) {
+                 msg = `သိသိသာသာ ကွာခြားသွားပါပြီ! ကမ္ဘာပေါ်က ၁ နှစ်ဟာ ယာဉ်ပေါ်မှာ ${(dilationFactor).toFixed(2)} နှစ် (လအနည်းငယ်) သာ ရှိပါတော့တယ်။`;
+            } else {
+                msg = "အမြန်နှုန်း မြင့်လာပါပြီ။ အာကာသယာဉ်ပေါ်က နာရီက ကမ္ဘာထက် ပိုနှေးကွေးစွာ လည်ပတ်နေတာကို တွေ့ရပါလိမ့်မယ်။";
+            }
+            explanation.innerText = msg;
+        }
+
+        function startSimulation() {
+            if (!isRunning) {
+                isRunning = true;
+                lastTimestamp = performance.now();
+                requestAnimationFrame(loop);
+            }
+        }
+
+        function stopSimulation() {
+            isRunning = false;
+        }
+
+        function resetSimulation() {
+            isRunning = false;
+            earthYears = 0;
+            spaceYears = 0;
+            updateDisplay();
+            // Reset visuals if needed, though slider position remains
+            // updateSpeedVisuals(slider.value); 
+        }
+
+        function loop(timestamp) {
+            if (!isRunning) return;
+
+            const deltaTime = (timestamp - lastTimestamp) / 1000; // seconds
+            lastTimestamp = timestamp;
+
+            // Simulation Speed: 1 real second = 1 year on Earth (for visualization)
+            const simulationRate = 1.0; 
+            
+            let earthDelta = deltaTime * simulationRate;
+            earthYears += earthDelta;
+
+            // t' = t * sqrt(1 - v^2/c^2)
+            let v = slider.value / 100;
+            let timeDilationFactor = Math.sqrt(1 - (v * v));
+            
+            spaceYears += (earthDelta * timeDilationFactor);
+
+            updateDisplay();
+            requestAnimationFrame(loop);
+        }
+
+        function updateDisplay() {
+            earthDisplay.innerText = earthYears.toFixed(2);
+            spaceDisplay.innerText = spaceYears.toFixed(2);
+        }
+
+        // Initialize
+        updateSpeedVisuals(0);
+
+    </script>
+</body>
+</html>
