@@ -3,23 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Time Dilation Simulator - Science Daily</title>
+    <title>Time Dilation Simulator - Science Daily (WebGL Edition)</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
     <style>
         :root {
             --primary-color: #00f2ff; /* Neon Cyan */
             --secondary-color: #ff0055; /* Neon Pink */
             --earth-color: #4ade80; /* Neon Green */
-            --bg-dark: #050a18;
-            --glass-bg: rgba(15, 23, 42, 0.6);
+            --bg-dark: #020617;
+            --glass-bg: rgba(15, 23, 42, 0.7);
             --glass-border: rgba(255, 255, 255, 0.1);
             --text-light: #e2e8f0;
-            --thruster-intensity: 0; /* CSS Variable changed by JS */
         }
 
         body {
             font-family: 'Roboto', sans-serif;
-            background: radial-gradient(ellipse at bottom, #1b2735 0%, var(--bg-dark) 100%);
+            background-color: var(--bg-dark);
+            /* Fallback background if WebGL fails to cover */
+            background: radial-gradient(ellipse at center, #1b2735 0%, var(--bg-dark) 100%); 
             color: var(--text-light);
             margin: 0;
             padding: 20px;
@@ -31,15 +35,12 @@
             position: relative;
         }
 
-        /* --- Background Star Animation --- */
-        #stars, #stars2, #stars3 {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            z-index: -1; animation: animStar 50s linear infinite;
+        /* WebGL Background Container */
+        #webgl-bg-container {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1; /* Place behind everything */
+            pointer-events: none;
         }
-        #stars:after, #stars2:after, #stars3:after { content: " "; position: absolute; top: 2000px; width: 1px; height: 1px; background: transparent; box-shadow: inherit; }
-        #stars { width: 1px; height: 1px; background: transparent; box-shadow: 174px 387px #FFF , 1462px 1347px #FFF , 317px 1634px #FFF , 1279px 199px #FFF , 1707px 462px #FFF , 995px 937px #FFF , 1401px 149px #FFF; animation-duration: 50s; }
-        #stars2 { width: 2px; height: 2px; background: transparent; box-shadow: 350px 1728px #FFF , 861px 256px #FFF , 1503px 1541px #FFF , 489px 1221px #FFF , 1596px 1178px #FFF , 54px 667px #FFF , 532px 169px #FFF; animation-duration: 100s; }
-        @keyframes animStar { from { transform: translateY(0px); } to { transform: translateY(-2000px); } }
 
         /* --- Typography & Header --- */
         h1, h2, .brand-header { font-family: 'Orbitron', sans-serif; letter-spacing: 2px; }
@@ -50,6 +51,7 @@
             text-transform: uppercase;
             margin-bottom: 10px;
             text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
+            position: relative; z-index: 10;
         }
 
         h1 {
@@ -57,16 +59,17 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             text-align: center; margin: 0 0 10px 0; font-size: 2.5rem;
+            position: relative; z-index: 10;
         }
 
-        .subtitle { text-align: center; color: #94a3b8; max-width: 600px; margin-bottom: 30px; line-height: 1.6; }
+        .subtitle { text-align: center; color: #94a3b8; max-width: 600px; margin-bottom: 30px; line-height: 1.6; position: relative; z-index: 10; }
 
         /* --- Glassmorphism Cards --- */
         .container { display: flex; flex-wrap: wrap; gap: 30px; justify-content: center; width: 100%; max-width: 900px; position: relative; z-index: 10; }
 
         .card {
             background: var(--glass-bg);
-            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
             border: 1px solid var(--glass-border);
             border-radius: 20px;
             padding: 30px 20px;
@@ -80,38 +83,24 @@
         .card.earth { border-bottom: 3px solid var(--earth-color); }
         .card.space { border-bottom: 3px solid var(--secondary-color); }
         
-        /* Dynamic Neon Glow based on speed */
-        .card.space::before {
-            content: ''; position: absolute; inset: 0;
-            box-shadow: 0 0 calc(var(--thruster-intensity) * 30px) var(--secondary-color);
-            opacity: var(--thruster-intensity);
-            transition: opacity 0.3s ease; border-radius: 20px; z-index: -1;
+        /* Containers for 3D Scenes inside cards */
+        .webgl-container {
+            width: 100%;
+            height: 200px; /* Fixed height for 3D view */
+            margin-bottom: 15px;
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
         }
-
-        .icon-wrapper { font-size: 4rem; margin-bottom: 15px; position: relative; display: inline-block; }
-
-        /* --- Rocket Engine Effect --- */
-        .rocket-icon { display: inline-block; position: relative; z-index: 2; }
-        .engine-plume {
-            position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%);
-            width: 20px; height: 40px;
-            background: linear-gradient(to bottom, var(--secondary-color), transparent);
-            filter: blur(10px);
-            opacity: var(--thruster-intensity); /* Controlled by JS */
-            transition: opacity 0.3s, height 0.3s;
-            z-index: 1;
-        }
-
-        /* Standard Float Animation */
-        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-15px); } 100% { transform: translateY(0px); } }
-        .floating { animation: float 4s ease-in-out infinite; }
+        #earth-scene-container { background: rgba(0,0,0,0.2); }
+        #space-scene-container { background: rgba(0,0,0,0.2); }
 
         .timer { font-family: 'Orbitron', monospace; font-size: 3rem; font-weight: 700; margin: 10px 0; text-shadow: 0 0 15px rgba(255,255,255,0.3); }
         .label { color: var(--primary-color); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
 
         /* --- Controls Section --- */
         .controls {
-            background: var(--glass-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            background: var(--glass-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
             border: 1px solid var(--glass-border); padding: 30px;
             border-radius: 20px; width: 100%; max-width: 900px; margin-top: 30px;
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); position: relative; z-index: 10;
@@ -151,14 +140,14 @@
         /* --- User Guide Collapsible --- */
         .guide-details { width: 100%; max-width: 900px; margin-bottom: 20px; z-index: 10; }
         .guide-summary {
-            background: var(--glass-bg); backdrop-filter: blur(12px); color: var(--primary-color);
+            background: var(--glass-bg); backdrop-filter: blur(15px); color: var(--primary-color);
             padding: 15px 25px; border-radius: 15px; cursor: pointer; font-family: 'Orbitron', sans-serif;
             border: 1px solid var(--glass-border); list-style: none; display: flex; justify-content: space-between; align-items: center;
         }
         .guide-summary::after { content: '▼'; font-size: 0.8rem; transition: transform 0.3s; }
         details[open] .guide-summary::after { transform: rotate(180deg); }
         .guide-content {
-            background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); padding: 20px 30px;
+            background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(15px); padding: 20px 30px;
             border-radius: 0 0 15px 15px; border: 1px solid var(--glass-border); border-top: none; margin-top: -5px;
         }
         .guide-content ol { padding-left: 20px; line-height: 1.8; }
@@ -166,51 +155,47 @@
 
         footer { margin-top: 40px; color: #64748b; font-size: 0.9rem; z-index: 10; }
 
-        /* Responsive Adjustments */
         @media (max-width: 600px) {
             h1 { font-size: 1.8rem; }
             .timer { font-size: 2.2rem; }
             .btn-group { flex-direction: column; width: 100%; }
             button { width: 100%; }
+            .webgl-container { height: 150px; }
         }
     </style>
 </head>
 <body>
-    <div id="stars"></div><div id="stars2"></div><div id="stars3"></div>
+    <div id="webgl-bg-container"></div>
 
-    <div class="brand-header">Science Daily မှ တင်ဆက်သည်</div>
+    <div class="brand-header">Science Daily မှ တင်ဆက်သည် (WebGL Edition)</div>
     <h1>Time Dilation Simulator</h1>
     <p class="subtitle">
-        အိုင်းစတိုင်း၏ နှိုင်းရသီအိုရီ (Theory of Relativity) အရ အလျင်မြန်လေ အချိန်နှေးလေ ဖြစ်ပုံကို မျက်စိဖြင့် တပ်အပ်မြင်တွေ့နိုင်မည့် လက်တွေ့စမ်းသပ်ခန်း။
+        အိုင်းစတိုင်း၏ နှိုင်းရသီအိုရီအရ အလျင်မြန်လေ အချိန်နှေးလေ ဖြစ်ပုံကို စွမ်းဆောင်ရည်မြင့် 3D ရုပ်ထွက်များဖြင့် လက်တွေ့စမ်းသပ်ခန်း။
     </p>
 
     <details class="guide-details">
         <summary class="guide-summary">🔰 အသုံးပြုပုံ လမ်းညွှန် (How to Use)</summary>
         <div class="guide-content">
             <ol>
-                <li>အောက်ဆုံးရှိ <b>"Slider (ထိန်းချုပ်တံ)"</b> ကို ဆွဲ၍ အာကာသယာဉ်၏ အမြန်နှုန်းကို သတ်မှတ်ပါ။ (၉၀% အထက် ဆွဲတင်ကြည့်ရန် အကြံပြုပါသည်။)</li>
+                <li>အောက်ဆုံးရှိ <b>"Slider (ထိန်းချုပ်တံ)"</b> ကို ဆွဲ၍ အာကာသယာဉ်၏ အမြန်နှုန်းကို သတ်မှတ်ပါ။ (ညာဘက်ရှိ 3D Warp Effect မြန်လာသည်ကို သတိပြုပါ။)</li>
                 <li><b>"စတင်မယ် (Start)"</b> ခလုတ်ကို နှိပ်ပါ။</li>
-                <li>ဘယ်ဘက် (ကမ္ဘာ) နှင့် ညာဘက် (အာကာသ) တို့ရှိ နာရီများ၏ ကုန်ဆုံးမှုနှုန်း မတူညီပုံကို လေ့လာပါ။ ယာဉ်အမြန်နှုန်း မြင့်လေလေ၊ ညာဘက်နာရီ ပိုနှေးလေလေ ဖြစ်ပါလိမ့်မည်။</li>
-                <li>အမြန်နှုန်းကို အချိန်မရွေး ထပ်မံ ပြောင်းလဲ စမ်းသပ်နိုင်ပါသည်။</li>
+                <li>ဘယ်ဘက် (ကမ္ဘာ) နှင့် ညာဘက် (အာကာသ) တို့ရှိ နာရီများ၏ ကုန်ဆုံးမှုနှုန်း မတူညီပုံကို လေ့လာပါ။</li>
             </ol>
         </div>
     </details>
 
     <div class="container">
         <div class="card earth">
-            <div class="icon-wrapper">🌍☕</div>
-            <div class="label">ကမ္ဘာပေါ်ရှိ ညီ</div>
+            <div id="earth-scene-container" class="webgl-container"></div>
+            <div class="label">ကမ္ဘာပေါ်ရှိ ညီအစ်ကို</div>
             <div class="timer" id="earthTime">0.00</div>
             <div class="label">ကုန်ဆုံးသွားသော နှစ် (Years)</div>
             <p style="font-size: 0.85rem; color: #94a3b8; margin-top: 15px;">သာမန်အချိန်အတိုင်း နေထိုင်နေသူ</p>
         </div>
 
         <div class="card space">
-            <div class="icon-wrapper floating">
-                <span class="rocket-icon">🚀👨‍🚀</span>
-                <div class="engine-plume"></div>
-            </div>
-            <div class="label">အာကာသယာဉ်ပေါ်ရှိ အစ်ကို</div>
+             <div id="space-scene-container" class="webgl-container"></div>
+            <div class="label">အာကာသယာဉ်ပေါ်ရှိ ညီအစ်ကို</div>
             <div class="timer" id="spaceTime">0.00</div>
             <div class="label">ကုန်ဆုံးသွားသော နှစ် (Years)</div>
             <p style="font-size: 0.85rem; color: #94a3b8; margin-top: 15px;">အလင်းအလျင်နီးပါး ခရီးနှင်နေသူ</p>
@@ -226,7 +211,7 @@
         <input type="range" id="speedSlider" min="0" max="99.9" step="0.1" value="0">
         
         <div class="fact-box" id="explanation">
-            အလျင် ၀% တွင် အချိန်ကွာခြားမှု မရှိပါ။ Slider ကို ဆွဲတင်ပြီး စမ်းသပ်ကြည့်ပါ။
+            အလျင် ၀% တွင် အချိန်ကွာခြားမှု မရှိပါ။ Slider ကို ဆွဲတင်ပြီး 3D Warp Effect ကို စမ်းသပ်ကြည့်ပါ။
         </div>
 
         <div class="btn-group">
@@ -237,34 +222,199 @@
     </div>
 
     <footer>
-        © 2024 Time Dilation Visualization. Created by Science Daily.
+        © 2024 Time Dilation Visualization. Created by Science Daily with WebGL/Three.js.
     </footer>
 
     <script>
+        // --- GLOBAL VARIABLES FOR SIMULATION ---
         let earthYears = 0;
         let spaceYears = 0;
         let isRunning = false;
         let lastTimestamp = 0;
-        const root = document.documentElement;
+        let currentSpeedPercent = 0; // To control 3D speed
 
+        // DOM Elements
         const earthDisplay = document.getElementById('earthTime');
         const spaceDisplay = document.getElementById('spaceTime');
         const slider = document.getElementById('speedSlider');
         const speedValDisplay = document.getElementById('speedVal');
         const explanation = document.getElementById('explanation');
 
-        // Update UI and Visual Effects when slider moves
+        // ==========================================
+        // WEBGL / THREE.JS IMPLEMENTATION SECTION
+        // ==========================================
+
+        // --- SCENE 1: 3D EARTH (Rotating Wireframe Sphere) ---
+        let earthScene, earthCamera, earthRenderer, earthMesh, earthWireframeBtn;
+        
+        function initEarthScene() {
+            const container = document.getElementById('earth-scene-container');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            earthScene = new THREE.Scene();
+            earthCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+            earthCamera.position.z = 5;
+
+            earthRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            earthRenderer.setSize(width, height);
+            container.appendChild(earthRenderer.domElement);
+
+            // Earth Geometry (Neon Style)
+            const geometry = new THREE.SphereGeometry(2, 32, 32);
+            // Base material (dark blue/green)
+            const material = new THREE.MeshBasicMaterial({ color: 0x001a33, transparent: true, opacity: 0.8 });
+            earthMesh = new THREE.Mesh(geometry, material);
+            
+            // Wireframe overlay (neon green/cyan)
+            const wireframeGeo = new THREE.WireframeGeometry(geometry);
+            const wireframeMat = new THREE.LineBasicMaterial({ color: 0x4ade80, linewidth: 1 });
+            earthWireframeBtn = new THREE.LineSegments(wireframeGeo, wireframeMat);
+            earthMesh.add(earthWireframeBtn);
+
+            earthScene.add(earthMesh);
+
+            // Add some ambient light
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            earthScene.add(ambientLight);
+        }
+
+        // --- SCENE 2: 3D SPACE WARP (Starfield + Ship) ---
+        let spaceScene, spaceCamera, spaceRenderer, stars, shipMesh;
+        let starGeo, starMat;
+        let warpSpeed = 0; // Controlled by slider
+
+        function initSpaceScene() {
+            const container = document.getElementById('space-scene-container');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            spaceScene = new THREE.Scene();
+            // Fog to make stars fade in distance
+            spaceScene.fog = new THREE.FogExp2(0x020617, 0.002); 
+
+            spaceCamera = new THREE.PerspectiveCamera(60, width / height, 1, 1000);
+            spaceCamera.position.z = 1;
+            spaceCamera.rotation.x = Math.PI/2; // Point camera upwards along Z axis
+
+            spaceRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            spaceRenderer.setSize(width, height);
+            container.appendChild(spaceRenderer.domElement);
+
+            // --- The "Warp" Starfield ---
+            starGeo = new THREE.BufferGeometry();
+            const starVertices = [];
+            for(let i=0; i<6000; i++) {
+                let x = (Math.random() - 0.5) * 2000;
+                let y = (Math.random() - 0.5) * 2000;
+                let z = (Math.random() - 0.5) * 2000;
+                starVertices.push(x, y, z);
+            }
+            starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+            
+            starMat = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 1.5,
+                transparent: true
+            });
+            stars = new THREE.Points(starGeo, starMat);
+            spaceScene.add(stars);
+
+            // --- Simple 3D Ship Representation (Low Poly Cone) ---
+            const shipGeo = new THREE.ConeGeometry(0.5, 2, 8);
+            const shipMat = new THREE.MeshPhongMaterial({ color: 0xff0055, emissive: 0x330011, shininess: 100 });
+            shipMesh = new THREE.Mesh(shipGeo, shipMat);
+            shipMesh.rotation.x = Math.PI; // Point forward
+            shipMesh.position.set(0, 50, 0); // Position in front of camera
+            spaceScene.add(shipMesh);
+
+             // Add lights for the ship
+             const directionalLight = new THREE.DirectionalLight(0x00f2ff, 1);
+             directionalLight.position.set(0, -1, 0);
+             spaceScene.add(directionalLight);
+        }
+
+        // --- Main WebGL Animation Loop ---
+        function animateWebGL() {
+            requestAnimationFrame(animateWebGL);
+
+            // Rotate Earth slowly
+            if(earthMesh) {
+                earthMesh.rotation.y += 0.002;
+                earthWireframeBtn.rotation.y -= 0.001; // Counter rotation for cool effect
+            }
+
+            // Animate Space Warp based on Slider Value
+            if(stars && starGeo) {
+                const positions = starGeo.attributes.position.array;
+                // Map slider percent (0-100) to warp speed (min 2, max 50)
+                warpSpeed = 2 + (currentSpeedPercent / 100) * 48; 
+
+                for(let i=0; i < positions.length; i+=3) {
+                    // Move stars along Z axis towards camera
+                    positions[i+1] -= warpSpeed; 
+                    
+                    // Reset star if it passes the camera
+                    if (positions[i+1] < -200) {
+                        positions[i+1] = 1000; 
+                    }
+                }
+                starGeo.attributes.position.needsUpdate = true;
+
+                // Make ship shake slightly at high speeds
+                if(shipMesh && currentSpeedPercent > 50) {
+                     shipMesh.position.x = (Math.random() - 0.5) * (currentSpeedPercent/500);
+                } else if (shipMesh) {
+                     shipMesh.position.x = 0;
+                }
+
+                // Change Star color based on speed (White -> Blue -> Cyan)
+                if(currentSpeedPercent > 80) starMat.color.setHex(0x00f2ff);
+                else if (currentSpeedPercent > 40) starMat.color.setHex(0xaaaaff);
+                else starMat.color.setHex(0xffffff);
+            }
+
+            // Render scenes
+            if(earthRenderer && earthScene && earthCamera) {
+                earthRenderer.render(earthScene, earthCamera);
+            }
+            if(spaceRenderer && spaceScene && spaceCamera) {
+                spaceRenderer.render(spaceScene, spaceCamera);
+            }
+        }
+
+        // Handle Window Resize for WebGL
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            // Earth Resize
+            const eContainer = document.getElementById('earth-scene-container');
+            earthCamera.aspect = eContainer.clientWidth / eContainer.clientHeight;
+            earthCamera.updateProjectionMatrix();
+            earthRenderer.setSize(eContainer.clientWidth, eContainer.clientHeight);
+
+            // Space Resize
+            const sContainer = document.getElementById('space-scene-container');
+            spaceCamera.aspect = sContainer.clientWidth / sContainer.clientHeight;
+            spaceCamera.updateProjectionMatrix();
+            spaceRenderer.setSize(sContainer.clientWidth, sContainer.clientHeight);
+        }
+
+        // Initialize WebGL Scenes
+        initEarthScene();
+        initSpaceScene();
+        animateWebGL(); // Start the 3D rendering loop immediately
+
+        // ==========================================
+        // SIMULATION LOGIC SECTION (JS)
+        // ==========================================
+
         slider.addEventListener('input', function() {
+            currentSpeedPercent = this.value; // Update global speed for WebGL
             updateSpeedVisuals(this.value);
         });
 
         function updateSpeedVisuals(val) {
             speedValDisplay.innerText = val + " % c (Light Speed)";
-            
-            // Calculate thruster intensity (0 to 1) based on speed
-            let intensity = val / 100;
-            // Update CSS variable for neon glow and engine plume effect
-            root.style.setProperty('--thruster-intensity', intensity);
             
             // Math Logic
             let v = val / 100;
@@ -272,15 +422,15 @@
             
             let msg = "";
             if (val == 0) {
-                msg = "အလျင် ၀% ဖြစ်သောကြောင့် အချိန်သွားနှုန်း အတူတူပါပဲ။";
+                msg = "အလျင် ၀% တွင် အချိန်ကွာခြားမှု မရှိပါ။ Slider ကို ဆွဲတင်ပြီး 3D Warp Effect ကို စမ်းသပ်ကြည့်ပါ။";
             } else if (val < 50) {
-                msg = "အမြန်နှုန်း နည်းနေသေးလို့ အချိန်ကွာခြားချက် သိပ်မသိသာသေးပါဘူး။ ပိုမြန်မြန် မောင်းကြည့်ပါ။";
+                msg = "အမြန်နှုန်း စတင် မြင့်တက်လာပါပြီ။ ညာဘက်ရှိ ကြယ်များ၏ ရွေ့လျားမှုကို သတိပြုပါ။";
             } else if (val > 99) {
-                msg = `အလွန်အံ့သြဖွယ်ပါ! အလင်းအလျင်နီးပါးဖြစ်လို့ ယာဉ်ပေါ်မှာ အချိန်ရပ်တန့်လုနီးပါး ဖြစ်နေပါပြီ။`;
+                msg = `WARP SPEED! အလင်းအလျင်နီးပါးဖြစ်လို့ ယာဉ်ပေါ်မှာ အချိန်ရပ်တန့်လုနီးပါး ဖြစ်နေပါပြီ။`;
             } else if (val > 90) {
                  msg = `သိသိသာသာ ကွာခြားသွားပါပြီ! ကမ္ဘာပေါ်က ၁ နှစ်ဟာ ယာဉ်ပေါ်မှာ ${(dilationFactor).toFixed(2)} နှစ် (လအနည်းငယ်) သာ ရှိပါတော့တယ်။`;
             } else {
-                msg = "အမြန်နှုန်း မြင့်လာပါပြီ။ အာကာသယာဉ်ပေါ်က နာရီက ကမ္ဘာထက် ပိုနှေးကွေးစွာ လည်ပတ်နေတာကို တွေ့ရပါလိမ့်မယ်။";
+                msg = "အမြန်နှုန်း မြင့်မားနေပါပြီ။ အာကာသယာဉ်ပေါ်က နာရီက ကမ္ဘာထက် ပိုနှေးကွေးစွာ လည်ပတ်နေတာကို တွေ့ရပါလိမ့်မယ်။";
             }
             explanation.innerText = msg;
         }
@@ -289,7 +439,7 @@
             if (!isRunning) {
                 isRunning = true;
                 lastTimestamp = performance.now();
-                requestAnimationFrame(loop);
+                requestAnimationFrame(simulationLoop);
             }
         }
 
@@ -302,17 +452,16 @@
             earthYears = 0;
             spaceYears = 0;
             updateDisplay();
-            // Reset visuals if needed, though slider position remains
-            // updateSpeedVisuals(slider.value); 
         }
 
-        function loop(timestamp) {
+        // This loop handles the math and timer updates separately from WebGL rendering
+        function simulationLoop(timestamp) {
             if (!isRunning) return;
 
             const deltaTime = (timestamp - lastTimestamp) / 1000; // seconds
             lastTimestamp = timestamp;
 
-            // Simulation Speed: 1 real second = 1 year on Earth (for visualization)
+            // Simulation Speed: 1 real second = 1 year on Earth
             const simulationRate = 1.0; 
             
             let earthDelta = deltaTime * simulationRate;
@@ -325,7 +474,7 @@
             spaceYears += (earthDelta * timeDilationFactor);
 
             updateDisplay();
-            requestAnimationFrame(loop);
+            requestAnimationFrame(simulationLoop);
         }
 
         function updateDisplay() {
@@ -333,7 +482,7 @@
             spaceDisplay.innerText = spaceYears.toFixed(2);
         }
 
-        // Initialize
+        // Initialize UI
         updateSpeedVisuals(0);
 
     </script>
